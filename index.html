@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DVD Bouncer - Roguelike</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0a0a0f;
+            --border-inactive: #1a1a2e;
+            --border-hover: #2d2d44;
+            --dvd-color: #ff3366;
+            --accent-cyan: #00ffaa;
+            --accent-gold: #ffaa00;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888888;
+            --danger: #ff4444;
+            --multiplier: #44aaff;
+            --generator: #44ff44;
+            --slow: #ffdd44;
+            --teleport: #aa44ff;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .game-wrapper {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+        }
+
+        .main-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--border-inactive);
+            border-radius: 8px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        .stat-value.score { color: var(--accent-cyan); }
+        .stat-value.gold { color: var(--accent-gold); }
+        .stat-value.round { color: var(--multiplier); }
+
+        .target {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .canvas-container {
+            position: relative;
+            border: 3px solid var(--border-inactive);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: var(--bg-dark);
+            cursor: crosshair;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-start {
+            background: var(--accent-cyan);
+            color: var(--bg-dark);
+            min-width: 100px;
+        }
+
+        .btn-start:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 170, 0.5);
+        }
+
+        .btn-clear {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-clear:hover {
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+        }
+
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .shop-panel {
+            width: 240px;
+            background: var(--border-inactive);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .shop-title {
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 12px;
+            color: var(--accent-gold);
+            letter-spacing: 2px;
+        }
+
+        .shop-selected {
+            font-size: 11px;
+            text-align: center;
+            color: var(--accent-cyan);
+            margin-bottom: 12px;
+            min-height: 16px;
+        }
+
+        .shop-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .shop-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: var(--bg-dark);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 2px solid transparent;
+        }
+
+        .shop-item:hover:not(.disabled) {
+            border-color: var(--text-secondary);
+        }
+
+        .shop-item.selected {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 12px rgba(0, 255, 170, 0.3);
+        }
+
+        .shop-item.disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .tile-preview {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #000;
+        }
+
+        .shop-item-info {
+            flex: 1;
+        }
+
+        .shop-item-name {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .shop-item-price {
+            font-size: 11px;
+            color: var(--accent-gold);
+        }
+
+        .shop-item-owned {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .round-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .round-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .round-overlay h2 {
+            font-size: 28px;
+            color: var(--accent-cyan);
+        }
+
+        .round-overlay .bonus {
+            font-size: 18px;
+            color: var(--accent-gold);
+        }
+
+        .btn-next {
+            background: var(--generator);
+            color: var(--bg-dark);
+            padding: 14px 28px;
+            font-size: 15px;
+        }
+
+        .btn-next:hover {
+            box-shadow: 0 0 24px rgba(68, 255, 68, 0.6);
+        }
+
+        .hint {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-4px); }
+            40% { transform: translateX(4px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        .shake {
+            animation: shake 0.25s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <div class="main-panel">
+            <div class="hud">
+                <div class="stat">
+                    <span class="stat-label">SCORE</span>
+                    <span class="stat-value score" id="scoreDisplay">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">ROUND</span>
+                    <span class="stat-value round" id="roundDisplay">1</span>
+                    <span class="target">Target: <span id="targetDisplay">500</span></span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">GOLD</span>
+                    <span class="stat-value gold" id="goldDisplay">100</span>
+                </div>
+            </div>
+            <div class="canvas-container" id="canvasContainer">
+                <canvas id="gameCanvas" width="720" height="520"></canvas>
+                <div class="round-overlay" id="roundOverlay">
+                    <h2>ROUND COMPLETE!</h2>
+                    <p class="bonus">Bonus: +<span id="bonusGold">50</span> Gold</p>
+                    <button class="btn btn-next" id="nextRoundBtn">Next Round</button>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-start" id="startBtn">Start</button>
+                <button class="btn btn-clear" id="clearBtn">Clear</button>
+            </div>
+            <p class="hint">Click border edges to place tiles. Buy from shop first.</p>
+        </div>
+        <div class="shop-panel">
+            <div class="shop-title">◈ SHOP ◈</div>
+            <div class="shop-selected" id="selectedText">Select a tile type</div>
+            <div class="shop-list" id="shopList"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const W = 720, H = 520;
+        const BORDER = 40;
+        const TILE_SZ = 36;
+        const SLOTS = 8;
+
+        const TILE_TYPES = [
+            { id: 'multiplier', name: 'Multiplier', price: 50, color: '#44aaff', icon: '×2', desc: '2x score per hit' },
+            { id: 'explosive', name: 'Explosive', price: 75, color: '#ff4444', icon: '💥', desc: 'Clears nearby tiles' },
+            { id: 'generator', name: 'Generator', price: 100, color: '#44ff44', icon: '⛃', desc: '+1 gold per 10s' },
+            { id: 'slow', name: 'Slow', price: 60, color: '#ffdd44', icon: '⏚', desc: 'Slows DVD by 20%' },
+            { id: 'teleport', name: 'Teleport', price: 80, color: '#aa44ff', icon: '⟷', desc: 'Random teleport' }
+        ];
+
+        let state = {
+            score: 0, gold: 100, round: 1, target: 500,
+            running: false, roundEnd: false,
+            selectedTile: null,
+            tiles: [], inventory: {}, multiStacks: 0,
+            slowActive: false, slowTimer: 0, genTimer: 0
+        };
+
+        let dvd = { x: W/2, y: H/2, size: 28, vx: 0, vy: 0, trail: [] };
+        let hoverSlot = null;
+        let effects = [];
+
+        function initInventory() {
+            TILE_TYPES.forEach(t => state.inventory[t.id] = 0);
+        }
+
+        function initGame() {
+            state.score = 0;
+            state.gold = 100;
+            state.round = 1;
+            state.target = 500;
+            state.running = false;
+            state.roundEnd = false;
+            state.selectedTile = null;
+            state.tiles = [];
+            state.multiStacks = 0;
+            state.slowActive = false;
+            state.slowTimer = 0;
+            state.genTimer = 0;
+            initInventory();
+            initDVD();
+            updateShopUI();
+            updateHUD();
+        }
+
+        function initDVD() {
+            const pad = BORDER + dvd.size + 4;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 3.5 + state.round * 0.4;
+            dvd.x = pad + Math.random() * (W - 2*pad);
+            dvd.y = pad + Math.random() * (H - 2*pad);
+            dvd.vx = Math.cos(angle) * speed;
+            dvd.vy = Math.sin(angle) * speed;
+            dvd.trail = [];
+        }
+
+        function getSlots() {
+            const slots = [];
+            const pad = BORDER;
+            const stepX = (W - 2*BORDER) / SLOTS;
+            const stepY = (H - 2*BORDER) / SLOTS;
+
+            for (let i = 0; i < SLOTS; i++) {
+                slots.push({ x: pad + stepX * (i + 0.5), y: BORDER/2, edge: 'top', idx: i });
+                slots.push({ x: pad + stepX * (i + 0.5), y: H - BORDER/2, edge: 'bottom', idx: i });
+                slots.push({ x: BORDER/2, y: pad + stepY * (i + 0.5), edge: 'left', idx: i });
+                slots.push({ x: W - BORDER/2, y: pad + stepY * (i + 0.5), edge: 'right', idx: i });
+            }
+            return slots;
+        }
+
+        function slotOccupied(edge, idx) {
+            return state.tiles.some(t => t.edge === edge && t.idx === idx);
+        }
+
+        function placeTile(slot) {
+            if (!state.selectedTile) return false;
+            if (slotOccupied(slot.edge, slot.idx)) return false;
+            if (state.inventory[state.selectedTile] <= 0) return false;
+
+            let hits = state.selectedTile === 'multiplier' ? 5 : null;
+            let timer = state.selectedTile === 'slow' ? 600 : null;
+
+            state.tiles.push({
+                x: slot.x, y: slot.y,
+                edge: slot.edge, idx: slot.idx,
+                type: state.selectedTile,
+                hits, timer
+            });
+
+            state.inventory[state.selectedTile]--;
+            if (state.inventory[state.selectedTile] <= 0) state.selectedTile = null;
+            updateHUD();
+            updateShopUI();
+            return true;
+        }
+
+        function checkCollision() {
+            const PLAY = { l: BORDER, r: W - BORDER - dvd.size, t: BORDER, b: H - BORDER - dvd.size };
+            const dxc = dvd.x + dvd.size/2, dyc = dvd.y + dvd.size/2;
+
+            for (let i = state.tiles.length - 1; i >= 0; i--) {
+                const t = state.tiles[i];
+                const dx = dxc - t.x, dy = dyc - t.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < (dvd.size + TILE_SZ) / 2) {
+                    triggerTile(t, i);
+                    return;
+                }
+            }
+        }
+
+        function triggerTile(tile, idx) {
+            let points = 10, text = '';
+
+            switch (tile.type) {
+                case 'multiplier':
+                    if (tile.hits > 0) {
+                        state.multiStacks = Math.min(state.multiStacks + 1, 4);
+                        tile.hits--;
+                        text = `×${Math.pow(2, state.multiStacks)}`;
+                    }
+                    if (tile.hits <= 0) state.tiles.splice(idx, 1);
+                    break;
+
+                case 'explosive':
+                    doExplosion(tile);
+                    return;
+
+                case 'generator':
+                    break;
+
+                case 'slow':
+                    state.slowActive = true;
+                    state.slowTimer = tile.timer;
+                    state.tiles.splice(idx, 1);
+                    text = 'SLOW!';
+                    break;
+
+                case 'teleport':
+                    const pad = BORDER + dvd.size + 4;
+                    dvd.x = pad + Math.random() * (W - 2*pad);
+                    dvd.y = pad + Math.random() * (H - 2*pad);
+                    state.tiles.splice(idx, 1);
+                    text = 'WARP!';
+                    break;
+            }
+
+            const mult = Math.pow(2, state.multiStacks);
+            points *= mult;
+            state.score += points;
+
+            effects.push({ x: tile.x, y: tile.y - 20, text: `+${points}${text}`, color: mult > 1 ? '#44aaff' : '#00ffaa', alpha: 1 });
+
+            if (state.score >= state.target && !state.roundEnd) {
+                state.roundEnd = true;
+                state.running = false;
+                document.getElementById('bonusGold').textContent = state.round * 50;
+                document.getElementById('roundOverlay').classList.add('show');
+            }
+            updateHUD();
+        }
+
+        function doExplosion(tile) {
+            document.getElementById('canvasContainer').classList.add('shake');
+            setTimeout(() => document.getElementById('canvasContainer').classList.remove('shake'), 250);
+
+            const survivors = state.tiles.filter(t => {
+                const dx = t.x - tile.x, dy = t.y - tile.y;
+                return Math.sqrt(dx*dx + dy*dy) > TILE_SZ * 1.8;
+            });
+            state.tiles = survivors;
+
+            state.score += 50;
+            effects.push({ x: tile.x, y: tile.y, text: '+50 BOOM!', color: '#ff4444', alpha: 1 });
+
+            if (state.score >= state.target && !state.roundEnd) {
+                state.roundEnd = true;
+                state.running = false;
+                document.getElementById('bonusGold').textContent = state.round * 50;
+                document.getElementById('roundOverlay').classList.add('show');
+            }
+            updateHUD();
+        }
+
+        function update() {
+            if (!state.running || state.roundEnd) return;
+
+            let speed = 3.5 + state.round * 0.4;
+            if (state.slowActive) speed *= 0.8;
+
+            const norm = Math.sqrt(dvd.vx * dvd.vx + dvd.vy * dvd.vy);
+            if (norm > 0) {
+                const ratio = speed / norm;
+                dvd.vx *= ratio;
+                dvd.vy *= ratio;
+            }
+
+            const PLAY = { l: BORDER, r: W - BORDER - dvd.size, t: BORDER, b: H - BORDER - dvd.size };
+
+            if (dvd.x < PLAY.l) { dvd.x = PLAY.l; dvd.vx = Math.abs(dvd.vx); }
+            if (dvd.x > PLAY.r) { dvd.x = PLAY.r; dvd.vx = -Math.abs(dvd.vx); }
+            if (dvd.y < PLAY.t) { dvd.y = PLAY.t; dvd.vy = Math.abs(dvd.vy); }
+            if (dvd.y > PLAY.b) { dvd.y = PLAY.b; dvd.vy = -Math.abs(dvd.vy); }
+
+            dvd.x += dvd.vx;
+            dvd.y += dvd.vy;
+
+            if (Math.abs(dvd.vx) < 0.1 && Math.abs(dvd.vy) < 0.1) {
+                initDVD();
+                return;
+            }
+
+            if (state.slowActive) {
+                state.slowTimer--;
+                if (state.slowTimer <= 0) state.slowActive = false;
+            }
+
+            if (state.tiles.length > 0) checkCollision();
+
+            if (dvd.trail.length > 6) dvd.trail.shift();
+            dvd.trail.push({ x: dvd.x, y: dvd.y, a: 1 });
+
+            const genTiles = state.tiles.filter(t => t.type === 'generator');
+            if (genTiles.length > 0) {
+                state.genTimer++;
+                if (state.genTimer >= 600) {
+                    state.gold += genTiles.length;
+                    state.genTimer = 0;
+                    updateHUD();
+                    updateShopUI();
+                }
+            }
+
+            for (let i = effects.length - 1; i >= 0; i--) {
+                effects[i].y -= 0.8;
+                effects[i].alpha -= 0.018;
+                if (effects[i].alpha <= 0) effects.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, W, H);
+
+            ctx.fillStyle = '#12121a';
+            ctx.fillRect(0, 0, W, BORDER);
+            ctx.fillRect(0, H-BORDER, W, BORDER);
+            ctx.fillRect(0, BORDER, BORDER, H-2*BORDER);
+            ctx.fillRect(W-BORDER, BORDER, BORDER, H-2*BORDER);
+
+            ctx.strokeStyle = '#1a1a28';
+            ctx.lineWidth = 1;
+            const step = (W - 2*BORDER) / SLOTS;
+            for (let i = 1; i < SLOTS; i++) {
+                ctx.beginPath();
+                ctx.moveTo(BORDER + step*i, BORDER);
+                ctx.lineTo(BORDER + step*i, H-BORDER);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(BORDER, BORDER + step*i);
+                ctx.lineTo(W-BORDER, BORDER + step*i);
+                ctx.stroke();
+            }
+
+            if (hoverSlot && !slotOccupied(hoverSlot.edge, hoverSlot.idx)) {
+                ctx.fillStyle = '#2a2a3a';
+                ctx.fillRect(hoverSlot.x - TILE_SZ/2, hoverSlot.y - TILE_SZ/2, TILE_SZ, TILE_SZ);
+            }
+
+            for (const t of state.tiles) {
+                ctx.fillStyle = TILE_TYPES.find(x => x.id === t.type).color;
+                ctx.fillRect(t.x - TILE_SZ/2, t.y - TILE_SZ/2, TILE_SZ, TILE_SZ);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(t.x - TILE_SZ/2 + 3, t.y - TILE_SZ/2 + 3, TILE_SZ - 6, TILE_SZ - 6);
+
+                if (t.type === 'multiplier' && t.hits !== null) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 11px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(t.hits, t.x, t.y);
+                }
+            }
+
+            if (state.running) {
+                for (let i = 0; i < dvd.trail.length - 1; i++) {
+                    const tr = dvd.trail[i];
+                    ctx.fillStyle = `rgba(255, 51, 102, ${(i / dvd.trail.length) * 0.25})`;
+                    ctx.fillRect(tr.x, tr.y, dvd.size, dvd.size);
+                }
+
+                ctx.shadowColor = '#ff3366';
+                ctx.shadowBlur = 18;
+                ctx.fillStyle = '#ff3366';
+                ctx.fillRect(dvd.x, dvd.y, dvd.size, dvd.size);
+                ctx.shadowBlur = 0;
+            }
+
+            for (const e of effects) {
+                ctx.globalAlpha = e.alpha;
+                ctx.fillStyle = e.color;
+                ctx.font = 'bold 14px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(e.text, e.x, e.y);
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function updateHUD() {
+            document.getElementById('scoreDisplay').textContent = state.score;
+            document.getElementById('goldDisplay').textContent = state.gold;
+            document.getElementById('roundDisplay').textContent = state.round;
+            document.getElementById('targetDisplay').textContent = state.target;
+        }
+
+        function updateShopUI() {
+            const list = document.getElementById('shopList');
+            list.innerHTML = '';
+
+            TILE_TYPES.forEach(t => {
+                const canBuy = state.gold >= t.price;
+                const hasOwned = state.inventory[t.id] > 0;
+                const eligible = canBuy && hasOwned;
+
+                const item = document.createElement('div');
+                item.className = 'shop-item' + (state.selectedTile === t.id ? ' selected' : '') + (!eligible ? ' disabled' : '');
+                item.innerHTML = `
+                    <div class="tile-preview" style="background:${t.color}">${t.icon}</div>
+                    <div class="shop-item-info">
+                        <div class="shop-item-name">${t.name}</div>
+                        <div class="shop-item-price">${t.price} Gold</div>
+                        <div class="shop-item-owned">Owned: ${state.inventory[t.id]}</div>
+                    </div>
+                `;
+
+                if (canBuy) {
+                    item.onclick = () => {
+                        if (state.inventory[t.id] > 0) {
+                            state.selectedTile = state.selectedTile === t.id ? null : t.id;
+                            updateShopUI();
+                        } else {
+                            state.gold -= t.price;
+                            state.inventory[t.id]++;
+                            state.selectedTile = t.id;
+                            updateHUD();
+                            updateShopUI();
+                        }
+                    };
+                }
+
+                list.appendChild(item);
+            });
+
+            document.getElementById('selectedText').textContent = state.selectedTile ?
+                `Selected: ${TILE_TYPES.find(x => x.id === state.selectedTile).name}` : 'Select a tile type';
+        }
+
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            const slots = getSlots();
+            let found = null, minDist = 999;
+
+            for (const s of slots) {
+                const d = Math.sqrt((s.x - mx)**2 + (s.y - my)**2);
+                if (d < TILE_SZ && d < minDist) {
+                    minDist = d;
+                    found = s;
+                }
+            }
+            hoverSlot = found;
+        });
+
+        canvas.addEventListener('mouseleave', () => { hoverSlot = null; });
+
+        canvas.addEventListener('click', () => {
+            if (hoverSlot && !slotOccupied(hoverSlot.edge, hoverSlot.idx)) {
+                placeTile(hoverSlot);
+            }
+        });
+
+        document.getElementById('startBtn').onclick = () => {
+            if (!state.running) {
+                if (dvd.vx === 0 && dvd.vy === 0) initDVD();
+                state.running = true;
+                document.getElementById('startBtn').textContent = 'Pause';
+            } else {
+                state.running = false;
+                document.getElementById('startBtn').textContent = 'Start';
+            }
+        };
+
+        document.getElementById('clearBtn').onclick = () => {
+            state.tiles = [];
+            state.multiStacks = 0;
+            state.slowActive = false;
+        };
+
+        document.getElementById('nextRoundBtn').onclick = () => {
+            state.gold += state.round * 50;
+            state.round++;
+            state.target = Math.floor(state.target * 1.5);
+            state.roundEnd = false;
+            state.multiStacks = 0;
+            state.slowActive = false;
+            initDVD();
+            document.getElementById('roundOverlay').classList.remove('show');
+            document.getElementById('startBtn').textContent = 'Start';
+            updateHUD();
+            updateShopUI();
+        };
+
+        initGame();
+        loop();
+    </script>
+</body>
+</html>
